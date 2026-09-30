@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Code Reviewer</title>
+<meta name="description" content="Local, free, open-model AI code review, explanation, and fix suggestion tool." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" id="hljs-theme">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   Design tokens — UI-UX Pro Max "Minimal Single Column" Pattern
+   Mode: Dark (OLED) only
+   Spacing base: 4px.  Type scale: 13/14/16/20/24px.
+   ────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:            #0F172A; /* Deep Slate */
+  --bg-surface:    #1E293B;
+  --bg-inset:      #0B1120;
+  --bg-elevated:   #334155;
+  --border:        #334155;
+  --border-strong: #475569;
+  --border-focus:  #22C55E;
+  --text:          #F8FAFC;
+  --text-secondary:#94A3B8;
+  --text-muted:    #64748B;
+  --accent:        #22C55E;
+  --accent-hover:  #16A34A;
+  --accent-glow:   rgba(34, 197, 94, 0.15);
+  --success:       #22C55E;
+  --warning:       #F59E0B;
+  --danger:        #EF4444;
+  --danger-bg:     rgba(239, 68, 68, 0.08);
+  --success-bg:    rgba(34, 197, 94, 0.08);
+  --diff-add-bg:   rgba(34, 197, 94, 0.12);
+  --diff-add-text: #4ADE80;
+  --diff-del-bg:   rgba(239, 68, 68, 0.12);
+  --diff-del-text: #F87171;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-hover: rgba(255, 255, 255, 0.2);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+/* ── Header ── */
+header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--bg-surface);
+  z-index: 10;
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header h1::before {
+  content: "";
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#status {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#status .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+#status.ok .dot    { background: var(--success); box-shadow: 0 0 6px var(--success); }
+#status.bad .dot   { background: var(--danger); }
+
+
+
+/* ── History toggle ── */
+.history-toggle {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms var(--ease-standard),
+              color 150ms var(--ease-standard),
+              border-color 150ms var(--ease-standard);
+  position: relative;
+}
+.history-toggle:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.history-toggle svg { width: 16px; height: 16px; }
+.history-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px; height: 16px;
+  border-radius: 8px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+.history-badge.show { display: flex; }
+
+/* ── Main layout ── */
+.app-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── History sidebar ── */
+.history-sidebar {
+  width: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 250ms var(--ease-decelerate);
+  flex-shrink: 0;
+}
+.history-sidebar.open { width: 280px; }
+.history-sidebar-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+.history-clear {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: color 150ms var(--ease-standard);
+}
+.history-clear:hover { color: var(--danger); }
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.history-item {
+  padding: 14px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 150ms var(--ease-standard);
+}
+.history-item:hover { background: var(--accent-glow); }
+.history-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.history-mode {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+.history-mode.fix { background: var(--success-bg); color: var(--success); }
+.history-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.history-preview {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.history-empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* ── Main panels ── */
+main {
+  flex: 1;
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  overflow: hidden;
+}
+.pane {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.pane-header {
+  padding: 14px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Code input area ── */
+.code-input-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 0;
+}
+textarea {
+  flex: 1;
+  resize: none;
+  background: var(--bg-inset);
+  color: var(--text);
+  border: none;
+  padding: 24px;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+  tab-size: 2;
+  min-height: 0;
+}
+textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+/* ── Drop zone overlay ── */
+.drop-zone {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: var(--accent-glow);
+  border: 2px dashed var(--accent);
+  border-radius: 4px;
+  z-index: 5;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.drop-zone.active {
+  display: flex;
+}
+.drop-zone svg { color: var(--accent); opacity: 0.7; }
+.drop-zone span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+/* ── File upload bar ── */
+.upload-bar {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.upload-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 150ms var(--ease-standard),
+              border-color 150ms var(--ease-standard),
+              color 150ms var(--ease-standard);
+}
+.upload-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#fileInput { display: none; }
+
+/* ── Controls bar ── */
+.controls {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Rate-limit banner ── */
+.rate-limit-banner {
+  padding: 16px 20px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.rate-limit-banner strong { display: block; margin-bottom: 4px; }
+.rate-limit-hint {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* ── Buttons & select ── */
+select, button {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms var(--ease-standard);
+}
+select:focus, button:focus-visible {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-surface);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+  transform: translateY(-1px);
+}
+button.fix-btn {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+button.fix-btn:hover:not(:disabled) {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+/* ── Output pane ── */
+#output {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  font-size: 14px;
+  line-height: 1.7;
+  min-height: 0;
+}
+#output pre {
+  background: var(--bg-inset);
+  padding: 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  margin: 12px 0;
+}
+#output code {
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 13px;
+}
+#output h3 {
+  font-size: 14px;
+  color: var(--accent);
+  margin-top: 20px;
+  margin-bottom: 4px;
+}
+#output p { margin: 8px 0; }
+#output ul, #output ol { margin: 8px 0 8px 20px; }
+
+/* ── Empty state ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 24px;
+  color: var(--text-muted);
+  padding: 40px;
+  text-align: center;
+}
+.empty-state svg {
+  opacity: 0.5;
+  transition: all 300ms var(--ease-standard);
+  color: var(--border-strong);
+}
+.empty-state:hover svg {
+  opacity: 1;
+  color: var(--accent);
+  transform: scale(1.05);
+}
+.empty-state p {
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 320px;
+}
+.empty-state strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Loading indicator ── */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 20px;
+  color: var(--text-muted);
+}
+.loading-pulse {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.loading-pulse span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.3;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.loading-pulse span:nth-child(2) { animation-delay: 0.2s; }
+.loading-pulse span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+.loading-text {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Diff view ── */
+.diff-container {
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.diff-header {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+.diff-line {
+  padding: 1px 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-line.add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-text);
+}
+.diff-line.del {
+  background: var(--diff-del-bg);
+  color: var(--diff-del-text);
+}
+.diff-line.ctx {
+  color: var(--text-muted);
+}
+.diff-gutter {
+  display: inline-block;
+  width: 20px;
+  text-align: right;
+  margin-right: 12px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  user-select: none;
+  font-size: 11px;
+}
+.diff-summary {
+  margin-top: 16px;
+}
+.diff-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.diff-stat-add { color: var(--diff-add-text); }
+.diff-stat-del { color: var(--diff-del-text); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  main { flex-direction: column; }
+  .history-sidebar.open { width: 100%; max-height: 200px; }
+  .app-body { flex-direction: column; }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI Code Reviewer</h1>
+  <div class="header-right">
+    <span id="status">
+      <span class="dot"></span>
+      <span class="label">checking&hellip;</span>
+    </span>
+    <button class="history-toggle" id="historyToggle" title="Review history" aria-label="Toggle review history">
+      <span class="history-badge" id="historyBadge"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    </button>
+
+  </div>
+</header>
+
+<div class="app-body">
+  <!-- History sidebar -->
+  <aside class="history-sidebar" id="historySidebar">
+    <div class="history-sidebar-header">
+      <span>History</span>
+      <button class="history-clear" id="historyClear">Clear all</button>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty" id="historyEmpty">No reviews yet. Run a review, explain, or fix to see it here.</div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Left pane: code input -->
+    <div class="pane">
+      <div class="pane-header">
+        <span>Paste your code</span>
+        <select id="language" aria-label="Language">
+          <option value="">Auto-detect</option>
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option>
+          <option value="java">Java</option>
+          <option value="go">Go</option>
+          <option value="rust">Rust</option>
+          <option value="c++">C++</option>
+          <option value="c">C</option>
+          <option value="sql">SQL</option>
+          <option value="html">HTML</option>
+          <option value="css">CSS</option>
+          <option value="ruby">Ruby</option>
+          <option value="php">PHP</option>
+          <option value="swift">Swift</option>
+          <option value="kotlin">Kotlin</option>
+          <option value="shell">Shell</option>
+        </select>
+      </div>
+      <div class="code-input-area" id="codeInputArea">
+        <textarea id="code" spellcheck="false" placeholder="Paste code here, or drag & drop a file…"></textarea>
+        <div class="drop-zone" id="dropZone">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span>Drop file to load</span>
+        </div>
+      </div>
+      <div class="upload-bar">
+        <span>or</span>
+        <button class="upload-btn" id="uploadBtn" type="button">Upload a file</button>
+        <input type="file" id="fileInput" />
+        <span id="fileName" style="color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+      </div>
+      <div class="controls">
+        <button class="primary" id="reviewBtn">Review</button>
+        <button id="explainBtn">Explain</button>
+        <button class="fix-btn" id="fixBtn">Suggest Fix</button>
+        <div style="flex:1"></div>
+        <select id="model" aria-label="Model"><option>default model</option></select>
+      </div>
+    </div>
+
+    <!-- Right pane: output -->
+    <div class="pane">
+      <div class="pane-header"><span>Result</span></div>
+      <div id="output">
+        <div class="empty-state" id="emptyState">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+            <line x1="14" y1="4" x2="10" y2="20" stroke-dasharray="2 2"></line>
+          </svg>
+          <p>Paste or upload code on the left, then click <strong>Review</strong>, <strong>Explain</strong>, or <strong>Suggest Fix</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────────
+   App logic
+   ────────────────────────────────────────────────────────────────── */
+const API_BASE = "";
+const $ = id => document.getElementById(id);
+
+const output     = $("output");
+const codeEl     = $("code");
+const langEl     = $("language");
+const modelEl    = $("model");
+const statusEl   = $("status");
+const reviewBtn  = $("reviewBtn");
+const explainBtn = $("explainBtn");
+const fixBtn     = $("fixBtn");
+const emptyState = $("emptyState");
+
+let openrouterAvailable = false;
+
+// ── Marked config ──
+marked.setOptions({
+  highlight: (code, lang) => {
+    try { return hljs.highlight(code, { language: lang || "plaintext" }).value; }
+    catch { return code; }
+  }
+});
+
+
+// ── Health & providers ──
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/api/health`);
+    const data = await r.json();
+    const label = statusEl.querySelector(".label");
+    if (data.ollama_reachable) {
+      label.textContent = `ready · ${data.default_model}`;
+      statusEl.className = "ok";
+    } else {
+      label.textContent = "backend up, Ollama unreachable";
+      statusEl.className = "bad";
+    }
+    // Show/hide provider toggle based on OpenRouter availability
+    const prevAvailable = openrouterAvailable;
+    openrouterAvailable = !!data.openrouter_available;
+    
+    // If OpenRouter availability changed, reload models to show/hide the group
+    if (prevAvailable !== openrouterAvailable) {
+      loadModels();
+    }
+  } catch {
+    statusEl.querySelector(".label").textContent = "backend unreachable";
+    statusEl.className = "bad";
+  }
+}
+
+async function loadModels() {
+  try {
+    const [ollamaRes, orRes] = await Promise.all([
+      fetch(`${API_BASE}/api/models?provider=ollama`).catch(() => null),
+      openrouterAvailable ? fetch(`${API_BASE}/api/models?provider=openrouter`).catch(() => null) : Promise.resolve(null)
+    ]);
+    
+    let html = '';
+    
+    if (ollamaRes && ollamaRes.ok) {
+      const data = await ollamaRes.json();
+      if (data.models && data.models.length > 0) {
+        html += '<optgroup label="Local (Ollama)">';
+        html += data.models.map(m => `<option value="${m.id}" data-provider="ollama">${m.label}</option>`).join("");
+        html += '</optgroup>';
+      }
+    }
+    
+    if (orRes && orRes.ok) {
+      const data = await orRes.json();
+      if (data.models && data.models.length > 0) {
+        html += '<optgroup label="OpenRouter (Free)">';
+        html += data.models.map(m => `<option value="${m.id}" data-provider="openrouter">${m.label}</option>`).join("");
+        html += '</optgroup>';
+      }
+    }
+    
+    if (!html) {
+      html = '<option value="" data-provider="ollama">default model</option>';
+    }
+
+    const prevVal = modelEl.value;
+    modelEl.innerHTML = html;
+    
+    if (prevVal && modelEl.querySelector(`option[value="${prevVal}"]`)) {
+      modelEl.value = prevVal;
+    } else if (openrouterAvailable) {
+      modelEl.value = "qwen/qwen-2.5-coder-32b-instruct:free";
+    }
+  } catch (e) {
+    console.error("Error loading models", e);
+  }
+}
+
+// ── File extension → language mapping ──
+const EXT_MAP = {
+  py: "python", pyw: "python",
+  js: "javascript", mjs: "javascript", cjs: "javascript", jsx: "javascript",
+  ts: "typescript", tsx: "typescript",
+  java: "java",
+  go: "go",
+  rs: "rust",
+  cpp: "c++", cxx: "c++", cc: "c++", hpp: "c++", hxx: "c++",
+  c: "c", h: "c",
+  sql: "sql",
+  html: "html", htm: "html",
+  css: "css", scss: "css", sass: "css", less: "css",
+  rb: "ruby", rake: "ruby",
+  php: "php",
+  swift: "swift",
+  kt: "kotlin", kts: "kotlin",
+  sh: "shell", bash: "shell", zsh: "shell",
+};
+
+function readFileIntoEditor(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    codeEl.value = e.target.result;
+    $("fileName").textContent = file.name;
+    // Auto-select language
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (EXT_MAP[ext]) {
+      langEl.value = EXT_MAP[ext];
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── File upload button ──
+$("uploadBtn").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", (e) => {
+  if (e.target.files.length) readFileIntoEditor(e.target.files[0]);
+});
+
+// ── Drag & drop ──
+const codeInputArea = $("codeInputArea");
+const dropZone = $("dropZone");
+let dragCounter = 0;
+
+codeInputArea.addEventListener("dragenter", (e) => {
+  e.preventDefault();
+  dragCounter++;
+  dropZone.classList.add("active");
+});
+codeInputArea.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  dragCounter--;
+  if (dragCounter <= 0) { dropZone.classList.remove("active"); dragCounter = 0; }
+});
+codeInputArea.addEventListener("dragover", (e) => e.preventDefault());
+codeInputArea.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dragCounter = 0;
+  dropZone.classList.remove("active");
+  if (e.dataTransfer.files.length) readFileIntoEditor(e.dataTransfer.files[0]);
+});
+
+// ── History ──
+const history = [];
+const historyList   = $("historyList");
+const historyEmpty  = $("historyEmpty");
+const historyBadge  = $("historyBadge");
+const historySidebar = $("historySidebar");
+
+$("historyToggle").addEventListener("click", () => {
+  historySidebar.classList.toggle("open");
+});
+
+$("historyClear").addEventListener("click", () => {
+  history.length = 0;
+  renderHistory();
+});
+
+function addHistory(mode, code, result, language) {
+  history.unshift({
+    mode,
+    code,
+    result,
+    language,
+    time: new Date(),
+    preview: code.split("\n")[0].substring(0, 60),
+  });
+  if (history.length > 50) history.pop(); // cap
+  renderHistory();
+}
+
+function renderHistory() {
+  if (history.length === 0) {
+    historyList.innerHTML = '<div class="history-empty">No reviews yet.</div>';
+    historyBadge.classList.remove("show");
+    return;
+  }
+  historyBadge.textContent = history.length;
+  historyBadge.classList.add("show");
+
+  historyList.innerHTML = history.map((h, i) => `
+    <div class="history-item" data-index="${i}">
+      <div class="history-item-meta">
+        <span class="history-mode ${h.mode === 'fix' ? 'fix' : ''}">${h.mode}</span>
+        <span class="history-time">${h.time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+      </div>
+      <div class="history-preview">${escapeHtml(h.preview)}</div>
+    </div>
+  `).join("");
+
+  historyList.querySelectorAll(".history-item").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = parseInt(el.dataset.index);
+      const h = history[idx];
+      codeEl.value = h.code;
+      if (h.language) langEl.value = h.language;
+      output.innerHTML = h.result;
+    });
+  });
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ── Loading state ──
+function showLoading(mode) {
+  const modeLabel = mode === "fix" ? "Generating fix…" : mode === "review" ? "Reviewing…" : "Explaining…";
+  output.innerHTML = `
+    <div class="loading-indicator">
+      <div class="loading-pulse">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="loading-text">${modeLabel}</div>
+    </div>
+  `;
+}
+
+// ── Diff rendering ──
+function extractCodeFromMarkdown(md) {
+  // Extract the first fenced code block from the model's response
+  const match = md.match(/```[\w]*\n([\s\S]*?)```/);
+  return match ? match[1].trimEnd() : null;
+}
+
+function renderDiff(original, fixed, explanationMd) {
+  const diff = Diff.createPatch("code", original, fixed, "Original", "Fixed");
+  const lines = diff.split("\n");
+  let addCount = 0, delCount = 0;
+  const htmlLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Skip file headers
+    if (line.startsWith("Index:") || line.startsWith("===") ||
+        line.startsWith("---") || line.startsWith("+++")) continue;
+    if (line.startsWith("@@")) {
+      htmlLines.push(`<div class="diff-line ctx" style="color:var(--accent);opacity:0.6">${escapeHtml(line)}</div>`);
+      continue;
+    }
+    if (line.startsWith("+")) {
+      addCount++;
+      htmlLines.push(`<div class="diff-line add"><span class="diff-gutter">+</span>${escapeHtml(line.slice(1))}</div>`);
+    } else if (line.startsWith("-")) {
+      delCount++;
+      htmlLines.push(`<div class="diff-line del"><span class="diff-gutter">−</span>${escapeHtml(line.slice(1))}</div>`);
+    } else if (line.startsWith(" ")) {
+      htmlLines.push(`<div class="diff-line ctx"><span class="diff-gutter"> </span>${escapeHtml(line.slice(1))}</div>`);
+    }
+  }
+
+  const statsHtml = `
+    <div class="diff-stats">
+      <span class="diff-stat-add">+${addCount} added</span>
+      <span class="diff-stat-del">−${delCount} removed</span>
+    </div>
+  `;
+
+  // If there's explanation text after the code block, render it
+  let explanationHtml = "";
+  if (explanationMd) {
+    // Get everything after the first code block
+    const afterCode = explanationMd.replace(/```[\w]*\n[\s\S]*?```/, "").trim();
+    if (afterCode) {
+      explanationHtml = `<div class="diff-summary">${marked.parse(afterCode)}</div>`;
+    }
+  }
+
+  if (addCount === 0 && delCount === 0) {
+    return `
+      <div style="padding:16px;color:var(--success);">
+        <strong>✓ No changes needed.</strong> The code looks correct as-is.
+      </div>
+      ${explanationHtml}
+    `;
+  }
+
+  return `
+    ${statsHtml}
+    <div class="diff-container">
+      <div class="diff-header">
+        <span>Inline Diff</span>
+        <span>${addCount + delCount} change${(addCount + delCount) > 1 ? "s" : ""}</span>
+      </div>
+      ${htmlLines.join("")}
+    </div>
+    ${explanationHtml}
+  `;
+}
+
+// ── Main run ──
+async function run(mode) {
+  const code = codeEl.value.trim();
+  if (!code) { alert("Paste some code first."); return; }
+
+  reviewBtn.disabled = true;
+  explainBtn.disabled = true;
+  fixBtn.disabled = true;
+  showLoading(mode);
+
+  let raw = "";
+  let firstChunk = true;
+
+  try {
+    const selectedOption = modelEl.options[modelEl.selectedIndex];
+    const provider = selectedOption ? selectedOption.dataset.provider : null;
+
+    const resp = await fetch(`${API_BASE}/api/${mode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        language: langEl.value || null,
+        model: modelEl.value || null,
+        provider: provider,
+      }),
+    });
+
+    if (!resp.ok || !resp.body) {
+      output.textContent = `Error: ${resp.status} ${await resp.text()}`;
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop();
+
+      for (const frame of frames) {
+        if (frame.startsWith("event: error")) {
+          const msg = frame.split("data: ")[1] || "unknown error";
+          if (msg.includes("rate limit") || msg.includes("429")) {
+            output.innerHTML = `
+              <div class="rate-limit-banner">
+                <strong>⚠ Rate Limit</strong>
+                ${escapeHtml(msg)}
+                <div class="rate-limit-hint">
+                  💡 Select an <strong>Ollama (local)</strong> model from the dropdown for unlimited local inference, or wait a minute and retry.
+                </div>
+              </div>
+            `;
+          } else {
+            output.innerHTML += `<p style="color:var(--danger)">Error: ${escapeHtml(msg)}</p>`;
+          }
+          continue;
+        }
+        if (frame.startsWith("event: done")) continue;
+        if (frame.startsWith("data: ")) {
+          if (firstChunk) { output.innerHTML = ""; firstChunk = false; }
+          raw += frame.slice(6).replace(/\\n/g, "\n");
+
+          if (mode === "fix") {
+            // For fix mode, show raw markdown while streaming
+            output.innerHTML = marked.parse(raw);
+          } else {
+            output.innerHTML = marked.parse(raw);
+          }
+          output.scrollTop = output.scrollHeight;
+        }
+      }
+    }
+
+    // After streaming completes, if fix mode, render the diff
+    if (mode === "fix" && raw) {
+      const fixedCode = extractCodeFromMarkdown(raw);
+      if (fixedCode !== null) {
+        output.innerHTML = renderDiff(code, fixedCode, raw);
+      }
+      // else leave the markdown as-is
+    }
+
+    // Save to history
+    addHistory(mode, code, output.innerHTML, langEl.value);
+
+  } catch (e) {
+    output.textContent = `Request failed: ${e.message}`;
+  } finally {
+    reviewBtn.disabled = false;
+    explainBtn.disabled = false;
+    fixBtn.disabled = false;
+  }
+}
+
+reviewBtn.addEventListener("click",  () => run("review"));
+explainBtn.addEventListener("click", () => run("explain"));
+fixBtn.addEventListener("click",     () => run("fix"));
+
+// ── Boot ──
+checkHealth();
+loadModels();
+setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

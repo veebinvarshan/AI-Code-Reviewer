@@ -1,0 +1,35 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-code-reviewer-ollama
+    ports:
+      - "11434:11434"          # exposed for debugging; not needed by the backend, which uses the internal network
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-qwen2.5-coder:7b-instruct-q4_K_M}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 10g          # leave headroom on a 16GB machine for the OS + backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ai-code-reviewer-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MODEL_NAME=${MODEL_NAME:-qwen2.5-coder:7b-instruct-q4_K_M}
+      - CORS_ORIGINS=*
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
