@@ -117,7 +117,7 @@ rendered incrementally as Markdown.
 Requires [Docker Desktop](https://docs.docker.com/get-docker/) running.
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/veebinvarshan/AI-Code-Reviewer.git
 cd ai-code-reviewer
 docker compose up --build
 ```
