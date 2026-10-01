@@ -8,6 +8,7 @@ import json
 from collections.abc import AsyncIterator
 
 import httpx
+
 from settings import settings
 
 

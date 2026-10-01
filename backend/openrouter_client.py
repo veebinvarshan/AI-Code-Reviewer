@@ -16,6 +16,7 @@ import json
 from collections.abc import AsyncIterator
 
 import httpx
+
 from settings import OPENROUTER_DEFAULT_MODEL, OPENROUTER_FREE_MODELS, settings
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -66,7 +67,7 @@ async def stream_generate(
 
     timeout = httpx.Timeout(settings.request_timeout_seconds)
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client: #noqa: SIM117
             async with client.stream(
                 "POST",
                 OPENROUTER_API_URL,
