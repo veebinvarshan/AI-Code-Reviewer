@@ -1,15 +1,14 @@
 import logging
 from pathlib import Path
 
+import ollama_client
+import openrouter_client
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-
-import ollama_client
-import openrouter_client
 from prompts import build_prompt
+from pydantic import BaseModel, Field
 from settings import settings
 
 logging.basicConfig(level=settings.log_level)

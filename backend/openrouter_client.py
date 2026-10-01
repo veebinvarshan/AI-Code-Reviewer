@@ -16,7 +16,6 @@ import json
 from collections.abc import AsyncIterator
 
 import httpx
-
 from settings import OPENROUTER_DEFAULT_MODEL, OPENROUTER_FREE_MODELS, settings
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
