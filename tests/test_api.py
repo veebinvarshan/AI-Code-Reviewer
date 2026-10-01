@@ -127,9 +127,8 @@ def test_models_openrouter_returns_curated_list(client):
     resp = client.get("/api/models?provider=openrouter")
     assert resp.status_code == 200
     models = resp.json()["models"]
-    assert len(models) == 5
+    assert len(models) == 4
     ids = [m["id"] for m in models]
-    assert "qwen/qwen-2.5-coder-32b-instruct:free" in ids
     assert "mistralai/mistral-7b-instruct:free" in ids
     assert "openrouter/free" in ids
 

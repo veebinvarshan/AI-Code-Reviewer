@@ -798,7 +798,7 @@ async function loadModels() {
     if (prevVal && modelEl.querySelector(`option[value="${prevVal}"]`)) {
       modelEl.value = prevVal;
     } else if (openrouterAvailable) {
-      modelEl.value = "qwen/qwen-2.5-coder-32b-instruct:free";
+      modelEl.value = "mistralai/mistral-7b-instruct:free";
     }
   } catch (e) {
     console.error("Error loading models", e);

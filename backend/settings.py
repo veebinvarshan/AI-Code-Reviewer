@@ -43,13 +43,12 @@ settings = Settings()
 # of the best FREE coding models, maintained by us so users don't
 # have to wade through 500+ models.  All cost $0 to use.
 OPENROUTER_FREE_MODELS = [
-    {"id": "qwen/qwen-2.5-coder-32b-instruct:free", "label": "Qwen 2.5 Coder 32B (free)"},
     {"id": "mistralai/mistral-7b-instruct:free", "label": "Mistral 7B (free)"},
     {"id": "cohere/north-mini-code:free", "label": "Cohere North Mini Code (free)"},
     {"id": "nvidia/nemotron-3-ultra-550b-a55b:free", "label": "Nemotron 3 Ultra (free)"},
     {"id": "openrouter/free", "label": "Auto (any free model)"},
 ]
 
-OPENROUTER_DEFAULT_MODEL = "qwen/qwen-2.5-coder-32b-instruct:free"
+OPENROUTER_DEFAULT_MODEL = "mistralai/mistral-7b-instruct:free"
 
 
