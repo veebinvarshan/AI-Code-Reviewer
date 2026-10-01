@@ -60,9 +60,9 @@ changes** — just add one line to `.env` (see section 4).
 
 | Model | Notes |
 |---|---|
-| `minimax/minimax-m3:free` | **Default when OpenRouter is selected.** Strong general-purpose coding model, high real-world usage. |
+| `mistralai/mistral-7b-instruct:free` | **Default when OpenRouter is selected.** Strong general-purpose coding model, high real-world usage. |
+| `cohere/north-mini-code:free` | Small, fast coding model. |
 | `nvidia/nemotron-3-ultra-550b-a55b:free` | Large MoE model, good for deeper reasoning on bigger snippets. |
-| `openai/gpt-oss-20b:free` | Smaller, fast, Apache-licensed. |
 | `openrouter/free` | Auto-router across whatever free models are currently available. |
 
 **Caveats worth knowing:**
